@@ -22,6 +22,7 @@ from pathlib import Path
 from plyfile import PlyData, PlyElement
 from utils.sh_utils import SH2RGB
 from scene.gaussian_model import BasicPointCloud
+from utils.camera_utils import generate_ellipse_path_from_camera_infos
 
 class CameraInfo(NamedTuple):
     uid: int
@@ -39,6 +40,7 @@ class SceneInfo(NamedTuple):
     point_cloud: BasicPointCloud
     train_cameras: list
     test_cameras: list
+    render_cameras: list
     nerf_normalization: dict
     ply_path: str
 
@@ -151,7 +153,9 @@ def readColmapSceneInfo(path, images, eval, llffhold=8):
     else:
         train_cam_infos = cam_infos
         test_cam_infos = []
-
+        
+    render_cam_infos = generate_ellipse_path_from_camera_infos(cam_infos)
+    
     nerf_normalization = getNerfppNorm(train_cam_infos)
 
     ply_path = os.path.join(path, "sparse/0/points3D.ply")
@@ -164,14 +168,15 @@ def readColmapSceneInfo(path, images, eval, llffhold=8):
         except:
             xyz, rgb, _ = read_points3D_text(txt_path)
         storePly(ply_path, xyz, rgb)
-    try:
-        pcd = fetchPly(ply_path)
-    except:
-        pcd = None
+    # try:
+    pcd = fetchPly(ply_path)
+    # except:
+        # pcd = None
 
     scene_info = SceneInfo(point_cloud=pcd,
                            train_cameras=train_cam_infos,
                            test_cameras=test_cam_infos,
+                           render_cameras=render_cam_infos,
                            nerf_normalization=nerf_normalization,
                            ply_path=ply_path)
     return scene_info
@@ -224,6 +229,8 @@ def readNerfSyntheticInfo(path, white_background, eval, extension=".png"):
     print("Reading Test Transforms")
     test_cam_infos = readCamerasFromTransforms(path, "transforms_test.json", white_background, extension)
     
+    render_cam_infos = generate_ellipse_path_from_camera_infos(train_cam_infos)
+    
     if not eval:
         train_cam_infos.extend(test_cam_infos)
         test_cam_infos = []
@@ -250,6 +257,7 @@ def readNerfSyntheticInfo(path, white_background, eval, extension=".png"):
     scene_info = SceneInfo(point_cloud=pcd,
                            train_cameras=train_cam_infos,
                            test_cameras=test_cam_infos,
+                           render_cameras=render_cam_infos,
                            nerf_normalization=nerf_normalization,
                            ply_path=ply_path)
     return scene_info
